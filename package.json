@@ -20,6 +20,13 @@
     "type": "git",
     "url": "git://github.com/ryuno-ki/metadataparser.git"
   },
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "index.js",
+    "package.json"
+  ],
   "engines": {
     "node": ">=24.0.0"
   },
