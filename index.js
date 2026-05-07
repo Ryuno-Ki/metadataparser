@@ -1,21 +1,21 @@
-'use strict';
+/* globals setImmediate */
+import urlModule from 'node:url';
 
-var urlModule = require('url');
+import * as cheerio from 'cheerio';
+import request from 'request';
+import extend from 'ampersand-class-extend';
 
-var cheerio = require('cheerio');
-var request = require('request');
-var extend = require('ampersand-class-extend');
-var pkg = require('./package.json');
-var defaultUserAgent = pkg.name.replace(/^@[^/]*\//, '') + '/' + pkg.version + (pkg.homepage ? ' (' + pkg.homepage + ')' : '');
-var AWS, sqs;
+import pkg from './package.json' with { type: 'json' };
 
-request = request.defaults({
+const defaultUserAgent = pkg.name.replace(/^@[^/]*\//, '') + '/' + pkg.version + (pkg.homepage ? ' (' + pkg.homepage + ')' : '');
+
+const req = request.defaults({
   pool: {maxSockets: Infinity},
   timeout: 8000,
   followRedirect: false
 });
 
-var ogTypes = [
+const ogTypes = [
   'video',
   'music',
   'article',
@@ -23,45 +23,23 @@ var ogTypes = [
   'profile'
 ];
 
-var sendAWSResponse = function (aws, result, callback) {
-  if (!sqs) {
-    AWS = require('aws-sdk');
-    AWS.config.apiVersion = '2015-01-30';
-    sqs = new AWS.SQS();
-  }
-
-  var params = {
-    MessageBody: JSON.stringify(result),
-    QueueUrl: aws
-  };
-
-  sqs.sendMessage(params, function (err, data) {
-    if (err) {
-      console.log('Error sending result', err, err.stack);
-    } else {
-      console.log('Sent result for', result.result.url, '–', data);
-    }
-    callback();
-  });
-};
-
-var createRequestHeaders = function (options) {
+function createRequestHeaders (options) {
   return {
     'User-Agent': ((options.userAgent || '') + ' ' + defaultUserAgent).trim(),
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
   };
-};
+}
 
-var isEmptyObject = function (obj) {
-  for (var key in obj) {
-    if (obj.hasOwnProperty(key)) {
+function isEmptyObject (obj) {
+  for (let key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
       return false;
     }
   }
   return true;
-};
+}
 
-var convertValue = function (typeTag, rootTag, property, value, baseUrl) {
+function convertValue (typeTag, rootTag, property, value, baseUrl) {
   value = value ? value.trim() : '';
 
   if (value === '') {
@@ -77,10 +55,10 @@ var convertValue = function (typeTag, rootTag, property, value, baseUrl) {
   }
 
   return value;
-};
+}
 
-var normalizeOGData = function (og) {
-  var setUrlAsValue = function (item) {
+function normalizeOGData (og) {
+  function setUrlAsValue (item) {
     if (!item.properties) {
       return item;
     }
@@ -95,36 +73,38 @@ var normalizeOGData = function (og) {
       delete item.properties;
     }
     return item;
-  };
+  }
 
-  var normalize = function (data, key, method) {
+  function normalize (data, key, method) {
     if (Array.isArray(data[key])) {
       data[key] = data[key].map(method).filter(function (row) {
         return row.value !== undefined && row.value !== '';
       });
     }
     return og;
-  };
+  }
 
   og = normalize(og, 'image', setUrlAsValue);
   og = normalize(og, 'video', setUrlAsValue);
   og = normalize(og, 'audio', setUrlAsValue);
 
-  for (var key in og) {
-    if (og.hasOwnProperty(key) && isEmptyObject(og[key])) {
+  for (let key in og) {
+    if (Object.prototype.hasOwnProperty.call(og, key) && isEmptyObject(og[key])) {
       delete og[key];
     }
   }
 
   return og;
-};
+}
 
-var MetaDataParser = function () {
-  this.extractors = {};
-  this.orderedExtractors = [];
+export class MetaDataParser {
+  constructor () {
+    this.extractors = {};
+    this.orderedExtractors = [];
 
-  this.addDefaultExtractors();
-};
+    this.addDefaultExtractors();
+  }
+}
 
 MetaDataParser.extend = extend;
 
@@ -141,7 +121,7 @@ MetaDataParser.prototype.addExtractor = function (name, method) {
 };
 
 MetaDataParser.prototype.removeExtractor = function (name) {
-  var method, pos;
+  let method, pos;
 
   method = this.extractors[name];
 
@@ -155,17 +135,17 @@ MetaDataParser.prototype.removeExtractor = function (name) {
 };
 
 MetaDataParser.prototype.extractOg = function ($, data) {
-  var currentRootTag;
-  var currentRootName;
-  var ogType;
+  let currentRootTag;
+  let currentRootName;
+  let ogType;
 
-  var extractOG = function (localData, elem) {
-    var $elem = $(elem);
-    var value = $elem.attr('content');
-    var property = $elem.attr('property').split(':');
-    var typeTag = property[0];
-    var rootTag = property[1];
-    var metaTag = property[2];
+  function extractOG (localData, elem) {
+    const $elem = $(elem);
+    let value = $elem.attr('content');
+    const property = $elem.attr('property').split(':');
+    const typeTag = property[0];
+    const rootTag = property[1];
+    const metaTag = property[2];
 
     if (!rootTag || metaTag === '') {
       return localData;
@@ -193,7 +173,7 @@ MetaDataParser.prototype.extractOg = function ($, data) {
     }
 
     return localData;
-  };
+  }
 
   data.og = $('meta[property^="og:"]').get().reduce(extractOG, {});
   data.og = normalizeOGData(data.og);
@@ -212,18 +192,18 @@ MetaDataParser.prototype.extractMetaProperties = function ($, data) {
   data.metaProperties = {};
 
   $('meta[property^="fb:"]').each(function () {
-    var $this = $(this);
-    var value = $this.attr('content');
-    var property = $this.attr('property');
+    const $this = $(this);
+    const value = $this.attr('content');
+    const property = $this.attr('property');
 
     data.metaProperties[property] = data.metaProperties[property] || [];
     data.metaProperties[property].push(value);
   });
 
   $('meta[name^="twitter:"], meta[name="generator"]').each(function () {
-    var $this = $(this);
-    var value = $this.attr('content');
-    var property = $this.attr('name');
+    const $this = $(this);
+    const value = $this.attr('content');
+    const property = $this.attr('name');
 
     data.metaProperties[property] = data.metaProperties[property] || [];
     data.metaProperties[property].push(value);
@@ -238,11 +218,11 @@ MetaDataParser.prototype.extractLinks = function ($, data) {
   data.links = {};
 
   $('head > link[rel]').each(function () {
-    var attributes = ['hreflang', 'title', 'type'];
+    const attributes = ['hreflang', 'title', 'type'];
 
-    var $this = $(this);
-    var relations = $this.attr('rel').split(' ');
-    var value = {};
+    const $this = $(this);
+    const relations = $this.attr('rel').split(' ');
+    const value = {};
 
     value.href = $this.attr('href');
 
@@ -253,7 +233,7 @@ MetaDataParser.prototype.extractLinks = function ($, data) {
     value.href = urlModule.resolve(data.baseUrl, value.href);
 
     attributes.forEach(function (attributeName) {
-      var attribute = $this.attr(attributeName);
+      const attribute = $this.attr(attributeName);
       if (attribute) {
         value[attributeName] = attribute;
       }
@@ -275,7 +255,7 @@ MetaDataParser.prototype.extractLinks = function ($, data) {
 };
 
 MetaDataParser.prototype.extractHeaders = function ($, data, context) {
-  var res = context.res;
+  const res = context.res;
 
   data.headers = {};
 
@@ -289,15 +269,15 @@ MetaDataParser.prototype.extractHeaders = function ($, data, context) {
 MetaDataParser.prototype.extract = function (url, html, res, options) {
   options = options || {};
 
-  var self = this;
-  var $ = cheerio.load(html);
-  var baseUrl;
-  var context = {
+  const self = this;
+  const $ = cheerio.load(html);
+  let baseUrl;
+  const context = {
     url: url,
     res: res
   };
-  var dataChain;
-  var extractorSubset;
+  let dataChain;
+  let extractorSubset;
 
   try {
     baseUrl = $('base').attr('href');
@@ -330,7 +310,7 @@ MetaDataParser.prototype.extract = function (url, html, res, options) {
 };
 
 MetaDataParser.prototype.fetch = function (url, meta, options, callback) {
-  var self = this;
+  const self = this;
 
   if (typeof options === 'function') {
     callback = options;
@@ -339,15 +319,15 @@ MetaDataParser.prototype.fetch = function (url, meta, options, callback) {
     options = options || {};
   }
 
-  request({
+  req({
     url: url,
     headers: createRequestHeaders(options)
   }, function (err, res, body) {
-    var result = {
+    const result = {
       url: url,
       meta: meta
     };
-    var promisedResult;
+    let promisedResult;
 
     if (err) {
       promisedResult = Promise.reject(err);
@@ -382,59 +362,41 @@ MetaDataParser.prototype.fetch = function (url, meta, options, callback) {
 };
 
 MetaDataParser.prototype.fetchBatch = function (request, callback) {
-  var self = this;
-  var aws;
+  const self = this;
 
-  if (callback.done) {
-    aws = request.aws;
-  }
-
-  var batch = request.batch;
+  const batch = request.batch;
 
   if (!request.batch || !Array.isArray(batch)) {
     throw new Error('Unknown input data');
   }
 
-  var options = request.options;
-  var remaining = batch.length;
-  var batchResult = [];
+  const options = request.options;
+  let remaining = batch.length;
+  const batchResult = [];
 
-  var handleCallback = function (err, result) {
-    var next = function () {
+  function handleCallback (err, result) {
+    function next () {
       remaining -= 1;
 
       if (remaining < 1) {
-        if (aws) {
-          callback.done(null, 'Fetched ' + batch.length + ' items');
-        } else {
-          callback(batchResult);
-        }
+        callback(batchResult);
       }
-    };
+    }
 
     result = {
       err: err,
       result: result
     };
 
-    if (aws) {
-      sendAWSResponse(aws, result, next);
-    } else {
-      batchResult.push(result);
-      next();
-    }
-  };
+    batchResult.push(result);
+    next();
+  }
 
   batch.forEach(function (item) {
     if (item.url) {
-      if (aws) {
-        console.log('Fetching', item.url);
-      }
       self.fetch(item.url, item.meta || {}, options, handleCallback);
     }
   });
 };
 
-module.exports = new MetaDataParser();
-
-module.exports.MetaDataParser = MetaDataParser;
+export default new MetaDataParser();
