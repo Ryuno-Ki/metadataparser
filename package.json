@@ -1,13 +1,24 @@
 {
-  "name": "@voxpelli/metadataparser",
-  "version": "2.0.1",
+  "name": "@ryunoki/metadataparser",
+  "version": "3.0.0",
   "description": "Parses the metadata of a web page. Useful for eg. link previews / embeds",
-  "author": "Pelle Wessman <pelle@kodfabrik.se>",
-  "homepage": "https://github.com/voxpelli/metadataparser",
+  "author": {
+    "name": "André Jaenisch",
+    "email": "andre.jaenisch.wdc@posteo.net",
+    "url": "https://jaenis.ch/"
+  },
+  "contributors": [
+    {
+      "name": "Pelle Wessman",
+      "email": "pelle@kodfabrik.se",
+      "url": "https://github.com/voxpelli"
+    }
+  ],
+  "homepage": "https://github.com/ryuno-ki/metadataparser",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git://github.com/voxpelli/metadataparser.git"
+    "url": "git://github.com/ryuno-ki/metadataparser.git"
   },
   "engines": {
     "node": ">=24.0.0"

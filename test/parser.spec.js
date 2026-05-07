@@ -405,7 +405,7 @@ describe('Parselovin', function () {
     beforeEach(function () {
       nock.disableNetConnect();
 
-      defaultUserAgentRegExp = 'metadataparser\\/\\d+\\.\\d+\\.\\d+ ' + escapeStringRegexp('(https://github.com/voxpelli/metadataparser)') + '$';
+      defaultUserAgentRegExp = 'metadataparser\\/\\d+\\.\\d+\\.\\d+ ' + escapeStringRegexp('(https://github.com/ryuno-ki/metadataparser)') + '$';
       testUserAgentRegExp = escapeStringRegexp('Test/1.0 ') + defaultUserAgentRegExp;
 
       defaultUserAgentRegExp = new RegExp('^' + defaultUserAgentRegExp);

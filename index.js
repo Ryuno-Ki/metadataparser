@@ -332,16 +332,13 @@ export class MetaDataParser {
         }
       });
 
-      relations.forEach(function (relation) {
-        relation = relation.trim().toLowerCase();
-
-        if (relation === '') {
-          return;
-        }
-
-        data.links[relation] = data.links[relation] || [];
-        data.links[relation].push(value);
-      });
+      relations
+        .map((relation) => relation.trim().toLowerCase())
+        .filter((relation) => relation !== '')
+        .forEach(function (relation) {
+          data.links[relation] = data.links[relation] || [];
+          data.links[relation].push(value);
+        });
     });
 
     return data;
@@ -352,7 +349,7 @@ export class MetaDataParser {
 
     data.headers = {};
 
-    if (res && res.headers['x-frame-options']) {
+    if (res?.headers['x-frame-options']) {
       data.headers['x-frame-options'] = res.headers['x-frame-options'];
     }
 

@@ -1,3 +1,10 @@
+## 3.0.0 (2026-05-07)
+
+* **Breaking:** Now requires at least Node 24.x
+* **Breaking:** Renamed to `@ryunoki/metadataparser`
+* **Breaking:** Callback-based API replaced with Promise-based one
+* **Breaking:** Dropped AWS-support (who believes in the Cloud anyway?)
+
 ## 2.0.1 (2016-11-03)
 
 * **Minor:** Remove Promise polyfill
