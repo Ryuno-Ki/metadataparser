@@ -35,5 +35,8 @@
   "dependencies": {
     "ampersand-class-extend": "2.0.0",
     "cheerio": "1.2.0"
+  },
+  "resolutions": {
+    "serialize-javascript": "7.0.5"
   }
 }
