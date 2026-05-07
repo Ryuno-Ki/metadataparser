@@ -36,7 +36,14 @@
     "ampersand-class-extend": "2.0.0",
     "cheerio": "1.2.0"
   },
+  "overrides": {
+    "mocha": {
+      "diff": "9.0.0",
+      "serialize-javascript": "7.0.5"
+    }
+  },
   "resolutions": {
+    "diff": "9.0.0",
     "serialize-javascript": "7.0.5"
   }
 }
