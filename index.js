@@ -1,19 +1,11 @@
-/* globals setImmediate */
 import urlModule from 'node:url';
 
 import * as cheerio from 'cheerio';
-import request from 'request';
 import extend from 'ampersand-class-extend';
 
 import pkg from './package.json' with { type: 'json' };
 
 const defaultUserAgent = pkg.name.replace(/^@[^/]*\//, '') + '/' + pkg.version + (pkg.homepage ? ' (' + pkg.homepage + ')' : '');
-
-const req = request.defaults({
-  pool: {maxSockets: Infinity},
-  timeout: 8000,
-  followRedirect: false
-});
 
 const ogTypes = [
   'video',
@@ -47,7 +39,7 @@ function convertValue (typeTag, rootTag, property, value, baseUrl) {
   }
 
   if (['url', 'secure_url', 'image', 'video', 'audio'].indexOf(property || rootTag) !== -1) {
-    return urlModule.resolve(baseUrl, value);
+    return resolve(baseUrl, value);
   }
 
   if (['width', 'height'].indexOf(property) !== -1) {
@@ -95,6 +87,19 @@ function normalizeOGData (og) {
   }
 
   return og;
+}
+
+// c.f. https://nodejs.org/api/url.html#urlresolvefrom-to
+function resolve(from, to) {
+  const resolvedUrl = new urlModule.URL(to, new urlModule.URL(from, 'resolve://'));
+
+  if (resolvedUrl.protocol === 'resolve:') {
+    // `from` is a relative URL.
+    const { pathname, search, hash } = resolvedUrl;
+    return `${pathname}${search}${hash}`;
+  }
+
+  return resolvedUrl.toString();
 }
 
 export class MetaDataParser {
@@ -151,7 +156,7 @@ export class MetaDataParser {
       return Promise.reject(e);
     }
 
-    baseUrl = baseUrl ? urlModule.resolve(url, baseUrl) : url;
+    baseUrl = baseUrl ? resolve(url, baseUrl) : url;
 
     if (options.extractors) {
       extractorSubset = [];
@@ -174,94 +179,52 @@ export class MetaDataParser {
     return dataChain;
   }
 
-  fetch (url, meta, options, callback) {
-    const self = this;
+  async fetch (url, meta, options = {}) {
+    try {
+      const res = await globalThis.fetch(
+        url,
+        {
+          headers: createRequestHeaders(options),
+          // TODO: Figure out whether `pool: {maxSockets: Infinity}` is needed
+          redirect: 'manual', // = do not follow redirects
+          signal: AbortSignal.timeout(8000),
+        }
+      );
 
-    if (typeof options === 'function') {
-      callback = options;
-      options = {};
-    } else {
-      options = options || {};
-    }
-
-    req({
-      url: url,
-      headers: createRequestHeaders(options)
-    }, function (err, res, body) {
       const result = {
-        url: url,
-        meta: meta
+        meta,
+        url,
       };
-      let promisedResult;
 
-      if (err) {
-        promisedResult = Promise.reject(err);
-      } else if (res.statusCode > 299) {
-        if (res.statusCode < 400 && res.headers.location) {
-          result.redirect = urlModule.resolve(url, res.headers.location);
-          promisedResult = Promise.resolve(result);
+      if (res.status > 299) {
+        if (res.status < 400 && res.headers.location) {
+          result.redirect = resolve(url, res.headers.location);
+          return Promise.resolve(result);
         } else {
-          promisedResult = Promise.reject(new Error('Invalid response. Code ' + res.statusCode));
+          return Promise.reject('Invalid response. Code ' + res.status);
         }
       } else {
-        promisedResult = self.extract(url, body, res, {
+        const body = await res.text();
+        const data = await this.extract(url, body, res, {
           extractors: options.extractors
-        }).then(function (data) {
-          result.data = data;
-          return result;
         });
+        result.data = data;
+        return Promise.resolve(result);
       }
-
-      promisedResult
-        .then(function (result) {
-          setImmediate(function () {
-            callback(null, result);
-          });
-        })
-        .catch(function (err) {
-          setImmediate(function () {
-            callback(err ? err.message : null, result);
-          });
-        });
-    });
+    } catch (err) {
+      return Promise.reject(err);
+    }
   }
 
-  fetchBatch = function (request, callback) {
-    const self = this;
-
-    const batch = request.batch;
-
-    if (!request.batch || !Array.isArray(batch)) {
+  async fetchBatch ({ batch, options }) {
+    if (!batch || !Array.isArray(batch)) {
       throw new Error('Unknown input data');
     }
 
-    const options = request.options;
-    let remaining = batch.length;
-    const batchResult = [];
-
-    function handleCallback (err, result) {
-      function next () {
-        remaining -= 1;
-
-        if (remaining < 1) {
-          callback(batchResult);
-        }
-      }
-
-      result = {
-        err: err,
-        result: result
-      };
-
-      batchResult.push(result);
-      next();
-    }
-
-    batch.forEach(function (item) {
-      if (item.url) {
-        self.fetch(item.url, item.meta || {}, options, handleCallback);
-      }
-    });
+    return Promise.allSettled(batch
+      .filter((item) => item.url)
+      .map((item) => this.fetch(item.url, item.meta || {}, options))
+    );
   }
 
   _extractOg ($, data) {
@@ -360,7 +323,7 @@ export class MetaDataParser {
         return;
       }
 
-      value.href = urlModule.resolve(data.baseUrl, value.href);
+      value.href = resolve(data.baseUrl, value.href);
 
       attributes.forEach(function (attributeName) {
         const attribute = $this.attr(attributeName);

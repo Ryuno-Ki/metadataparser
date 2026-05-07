@@ -417,7 +417,7 @@ describe('Parselovin', function () {
     });
 
     describe('fetch', function () {
-      it('should process the webpage', function (done) {
+      it('should process the webpage', async function () {
         const mock = nock('http://example.com/')
           .matchHeader('User-Agent', defaultUserAgentRegExp)
           .get('/')
@@ -425,21 +425,16 @@ describe('Parselovin', function () {
             return basicHTML;
           });
 
-        parser.fetch('http://example.com/', {foo: 123}, function (err, result) {
-          mock.done();
+        const result = await parser.fetch('http://example.com/', {foo: 123});
+        mock.done();
 
-          //FIXME: Why does this fail?
-          //should.not.exist(err);
-          result.should.have.property('url', 'http://example.com/');
-          result.should.have.property('meta').that.deep.equals({foo: 123});
-          result.should.have.property('data');
-          result.data.should.have.property('og').that.is.not.empty;
-
-          done();
-        });
+        result.should.have.property('url', 'http://example.com/');
+        result.should.have.property('meta').that.deep.equals({foo: 123});
+        result.should.have.property('data');
+        result.data.should.have.property('og').that.is.not.empty;
       });
 
-      it('should accept custom user-agent', function (done) {
+      it('should accept custom user-agent', async function () {
         const mock = nock('http://example.com/')
           .matchHeader('User-Agent', testUserAgentRegExp)
           .get('/')
@@ -447,45 +442,40 @@ describe('Parselovin', function () {
             return basicHTML;
           });
 
-        parser.fetch('http://example.com/', {foo: 123}, {userAgent: 'Test/1.0'}, function (err, result) {
-          mock.done();
+        const result = await parser.fetch('http://example.com/', {foo: 123}, {userAgent: 'Test/1.0'});
+        mock.done();
 
-          //FIXME: Why does this fail?
-          //should.not.exist(err);
-          result.should.have.property('url', 'http://example.com/');
-          result.should.have.property('meta').that.deep.equals({foo: 123});
-          result.should.have.property('data');
-          result.data.should.have.property('og').that.is.not.empty;
-
-          done();
-        });
+        result.should.have.property('url', 'http://example.com/');
+        result.should.have.property('meta').that.deep.equals({foo: 123});
+        result.should.have.property('data');
+        result.data.should.have.property('og').that.is.not.empty;
       });
 
-      it('should send an error on non-2xx response', function (done) {
+      it('should send an error on non-2xx response', async function () {
         const mock = nock('http://example.com/')
           .get('/')
           .reply(404, function () {
             return basicHTML;
           });
 
-        parser.fetch('http://example.com/', {foo: 123}, function (err, result) {
+        try {
+          const result = await parser.fetch('http://example.com/', {foo: 123});
           mock.done();
-
-          //FIXME: Why does this fail?
-          //should.exist(err);
-          err.should.equal('Invalid response. Code 404');
 
           result.should.have.property('url', 'http://example.com/');
           result.should.have.property('meta').that.deep.equals({foo: 123});
           result.should.not.have.property('data');
+        } catch (err) {
+          mock.done();
 
-          done();
-        });
+          err.should.equal('Invalid response. Code 404');
+          return;
+        }
       });
     });
 
     describe('fetchBatch', function () {
-      it('should process the webpages', function (done) {
+      it('should process the webpages', async function () {
         const mock = nock('http://example.com/')
           .matchHeader('User-Agent', defaultUserAgentRegExp)
           .get('/foo')
@@ -497,37 +487,34 @@ describe('Parselovin', function () {
             return bigExampleHTML;
           });
 
-        parser.fetchBatch({
+        const result = await parser.fetchBatch({
           batch: [
             {url: 'http://example.com/foo', meta: {foo: 123}},
             {url: 'http://example.com/bar', meta: {bar: 456}}
           ]
-        }, function (result) {
-          mock.done();
-
-          result.should.be.an('array').with.a.lengthOf(2);
-          const [firstResult, secondResult] = result;
-
-          firstResult.should.have.property('err', null);
-          firstResult.should.have.property('result');
-          firstResult.result.should.have.property('url', 'http://example.com/foo');
-          firstResult.result.should.have.property('meta').that.deep.equals({foo: 123});
-          firstResult.result.should.have.property('data');
-          firstResult.result.data.should.have.property('og').that.is.not.empty;
-
-          secondResult.should.have.property('err', null);
-          secondResult.should.have.property('result');
-          secondResult.result.should.have.property('url', 'http://example.com/bar');
-          secondResult.result.should.have.property('meta').that.deep.equals({bar: 456});
-          secondResult.result.should.have.property('data');
-          secondResult.result.data.should.have.property('og').that.is.not.empty;
-          secondResult.result.data.should.have.property('metaProperties').that.is.not.empty;
-
-          done();
         });
+        mock.done();
+
+        result.should.be.an('array').with.a.lengthOf(2);
+        const [firstResult, secondResult] = result;
+
+        firstResult.should.have.property('status', 'fulfilled');
+        firstResult.should.have.property('value');
+        firstResult.value.should.have.property('url', 'http://example.com/foo');
+        firstResult.value.should.have.property('meta').that.deep.equals({foo: 123});
+        firstResult.value.should.have.property('data');
+        firstResult.value.data.should.have.property('og').that.is.not.empty;
+
+        secondResult.should.have.property('status', 'fulfilled');
+        secondResult.should.have.property('value');
+        secondResult.value.should.have.property('url', 'http://example.com/bar');
+        secondResult.value.should.have.property('meta').that.deep.equals({bar: 456});
+        secondResult.value.should.have.property('data');
+        secondResult.value.data.should.have.property('og').that.is.not.empty;
+        secondResult.value.data.should.have.property('metaProperties').that.is.not.empty;
       });
 
-      it('should accept custom user-agent', function (done) {
+      it('should accept custom user-agent', async function () {
         const mock = nock('http://example.com/')
           .matchHeader('User-Agent', testUserAgentRegExp)
           .get('/foo')
@@ -539,38 +526,35 @@ describe('Parselovin', function () {
             return bigExampleHTML;
           });
 
-        parser.fetchBatch({
+        const result = await parser.fetchBatch({
           batch: [
             {url: 'http://example.com/foo', meta: {foo: 123}},
             {url: 'http://example.com/bar', meta: {bar: 456}}
           ],
           options: {userAgent: 'Test/1.0'}
-        }, function (result) {
-          mock.done();
-
-          result.should.be.an('array').with.a.lengthOf(2);
-          const [firstResult, secondResult] = result;
-
-          firstResult.should.have.property('err', null);
-          firstResult.should.have.property('result');
-          firstResult.result.should.have.property('url', 'http://example.com/foo');
-          firstResult.result.should.have.property('meta').that.deep.equals({foo: 123});
-          firstResult.result.should.have.property('data');
-          firstResult.result.data.should.have.property('og').that.is.not.empty;
-
-          secondResult.should.have.property('err', null);
-          secondResult.should.have.property('result');
-          secondResult.result.should.have.property('url', 'http://example.com/bar');
-          secondResult.result.should.have.property('meta').that.deep.equals({bar: 456});
-          secondResult.result.should.have.property('data');
-          secondResult.result.data.should.have.property('og').that.is.not.empty;
-          secondResult.result.data.should.have.property('metaProperties').that.is.not.empty;
-
-          done();
         });
+        mock.done();
+
+        result.should.be.an('array').with.a.lengthOf(2);
+        const [firstResult, secondResult] = result;
+
+        firstResult.should.have.property('status', 'fulfilled');
+        firstResult.should.have.property('value');
+        firstResult.value.should.have.property('url', 'http://example.com/foo');
+        firstResult.value.should.have.property('meta').that.deep.equals({foo: 123});
+        firstResult.value.should.have.property('data');
+        firstResult.value.data.should.have.property('og').that.is.not.empty;
+
+        secondResult.should.have.property('status', 'fulfilled');
+        secondResult.should.have.property('value');
+        secondResult.value.should.have.property('url', 'http://example.com/bar');
+        secondResult.value.should.have.property('meta').that.deep.equals({bar: 456});
+        secondResult.value.should.have.property('data');
+        secondResult.value.data.should.have.property('og').that.is.not.empty;
+        secondResult.value.data.should.have.property('metaProperties').that.is.not.empty;
       });
 
-      it('should send an error on non-2xx response', function (done) {
+      it('should send an error on non-2xx response', async function () {
         const mock = nock('http://example.com/')
           .get('/foo')
           .reply(404, function () {
@@ -581,33 +565,28 @@ describe('Parselovin', function () {
             return bigExampleHTML;
           });
 
-        parser.fetchBatch({
+        const result = await parser.fetchBatch({
           batch: [
             {url: 'http://example.com/foo', meta: {foo: 123}},
             {url: 'http://example.com/bar', meta: {bar: 456}}
           ]
-        }, function (result) {
-          mock.done();
-
-          result.should.be.an('array').with.a.lengthOf(2);
-          const [firstResult, secondResult] = result;
-
-          firstResult.should.have.property('err').that.equals('Invalid response. Code 404');
-          firstResult.should.have.property('result');
-          firstResult.result.should.have.property('url', 'http://example.com/foo');
-          firstResult.result.should.have.property('meta').that.deep.equals({foo: 123});
-          firstResult.result.should.not.have.property('data');
-
-          secondResult.should.have.property('err', null);
-          secondResult.should.have.property('result');
-          secondResult.result.should.have.property('url', 'http://example.com/bar');
-          secondResult.result.should.have.property('meta').that.deep.equals({bar: 456});
-          secondResult.result.should.have.property('data');
-          secondResult.result.data.should.have.property('og').that.is.not.empty;
-          secondResult.result.data.should.have.property('metaProperties').that.is.not.empty;
-
-          done();
         });
+        mock.done();
+
+        result.should.be.an('array').with.a.lengthOf(2);
+        const [firstResult, secondResult] = result;
+
+        firstResult.should.have.property('status').that.equals('rejected');
+        firstResult.should.have.property('reason').that.equals('Invalid response. Code 404');
+        firstResult.should.not.have.property('value');
+
+        secondResult.should.have.property('status').that.equals('fulfilled');
+        secondResult.should.have.property('value');
+        secondResult.value.should.have.property('url', 'http://example.com/bar');
+        secondResult.value.should.have.property('meta').that.deep.equals({bar: 456});
+        secondResult.value.should.have.property('data');
+        secondResult.value.data.should.have.property('og').that.is.not.empty;
+        secondResult.value.data.should.have.property('metaProperties').that.is.not.empty;
       });
     });
   });

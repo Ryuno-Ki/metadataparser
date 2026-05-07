@@ -34,7 +34,6 @@
   },
   "dependencies": {
     "ampersand-class-extend": "2.0.0",
-    "cheerio": "1.2.0",
-    "request": "2.88.2"
+    "cheerio": "1.2.0"
   }
 }
