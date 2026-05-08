@@ -1,7 +1,8 @@
 {
   "name": "@ryunoki/metadataparser",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Parses the metadata of a web page. Useful for eg. link previews / embeds",
+  "main": "./index.js",
   "author": {
     "name": "André Jaenisch",
     "email": "andre.jaenisch.wdc@posteo.net",

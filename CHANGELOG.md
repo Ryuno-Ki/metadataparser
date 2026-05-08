@@ -1,3 +1,7 @@
+## 3.0.1 (2026-05-08)
+
+* **Minor:** Add a `main` entry to package.json
+
 ## 3.0.0 (2026-05-07)
 
 * **Breaking:** Now requires at least Node 24.x
